@@ -1,10 +1,10 @@
-package org.firstinspires.ftc.teamcode;
+package org.firstinspires.ftc.teamcode.aopModes;
 
 import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
 import com.qualcomm.robotcore.eventloop.opmode.TeleOp;
 
-import org.firstinspires.ftc.teamcode.subsystem.Drivetrain;
-import org.firstinspires.ftc.teamcode.subsystem.Intake;
+import org.firstinspires.ftc.teamcode.subSystem.Drivetrain;
+import org.firstinspires.ftc.teamcode.subSystem.Intake;
 
 /**
  * 负责读取手柄输入，并协调底盘和 Intake 两个 subsystem。
