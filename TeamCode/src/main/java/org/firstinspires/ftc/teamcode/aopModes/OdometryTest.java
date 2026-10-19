@@ -41,12 +41,12 @@ public class OdometryTest extends LinearOpMode {
         while (!isStarted() && !isStopRequested()) {
             pinpoint.update();
             GoBildaPinpointDriver.DeviceStatus status = pinpoint.getDeviceStatus();
-            telemetry.addLine("INIT: Keep robot still / 保持车静止");
+            telemetry.addLine("INIT: Keep robot still");
             telemetry.addData("Pinpoint", status);
             if (isReady(status, resetTimer)) {
-                telemetry.addLine("READY: Press START / 可以开始");
+                telemetry.addLine("READY: Press START");
             } else {
-                telemetry.addLine("Waiting for READY; readings are invalid / 等待校准");
+                telemetry.addLine("Waiting for READY; readings are invalid");
             }
             telemetry.update();
             idle();

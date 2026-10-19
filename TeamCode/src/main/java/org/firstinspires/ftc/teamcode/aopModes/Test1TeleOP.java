@@ -41,14 +41,14 @@ public class Test1TeleOP extends LinearOpMode {
         }
 
         while (opModeIsActive()) {
-            // 这个底盘的实际电机方向需要直接使用摇杆 Y 值，推前时机器人才能向前。
-            // This drivetrain uses the raw Y value so pushing the stick forward moves the robot forward.
-            double forward = applyDeadband(gamepad1.left_stick_y);
+            // 摇杆向前推时 Y 为负，取反后转换为底盘的正向前进指令。
+            // Stick Y is negative when pushed forward; negate it for a positive forward command.
+            double forward = applyDeadband(-gamepad1.left_stick_y);
 
-            // 反转两个水平轴以匹配实际底盘：左摇杆方向对应横移，右摇杆方向对应旋转。
-            // Invert both horizontal axes to match the robot's actual strafe and turn directions.
-            double strafe = applyDeadband(-gamepad1.left_stick_x);
-            double turn = applyDeadband(-gamepad1.right_stick_x);
+            // 水平轴向右为正：左摇杆控制横移，右摇杆控制旋转。
+            // Stick X is positive to the right: the left stick strafes and the right stick turns.
+            double strafe = applyDeadband(gamepad1.left_stick_x);
+            double turn = applyDeadband(gamepad1.right_stick_x);
 
             // TeleOp 只发出移动指令，具体的麦轮计算由 Drivetrain 完成。
             // TeleOp sends the command; Drivetrain performs the mecanum wheel calculations.
