@@ -30,6 +30,12 @@ public class Shooter {
     // The goBILDA 5203 6000 RPM is 1:1 with no gearbox, reading 28 per revolution; top speed is about 2800 ticks/s.
     private static final double TICKS_PER_REV = 28.0;
 
+    // 电机空载最高转速 6000 RPM = 2800 ticks/秒；远近两档按它的比例设定，上车后调整比例。
+    // The motor's free speed is 6000 RPM = 2800 ticks/s; far and near are set as fractions of it, tuned on the robot.
+    private static final double MAX_VELOCITY_TPS = 2800.0;
+    public static final double FAR_VELOCITY_TPS = MAX_VELOCITY_TPS * 0.45;
+    public static final double NEAR_VELOCITY_TPS = MAX_VELOCITY_TPS * 0.35      ;
+
     // 实际速度与目标相差不超过该值才算到速；数值需实测后调整。
     // The flywheel counts as at speed only within this error; tune after testing.
     private static final double READY_TOLERANCE_TPS = 50.0;

@@ -1,4 +1,4 @@
-package org.firstinspires.ftc.teamcode.aopModes;
+package org.firstinspires.ftc.teamcode.AopModes;
 
 import com.qualcomm.hardware.gobilda.GoBildaPinpointDriver;
 import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;

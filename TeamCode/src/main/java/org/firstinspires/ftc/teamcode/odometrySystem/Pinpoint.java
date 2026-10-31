@@ -26,17 +26,19 @@ public class Pinpoint {
     // The Y pod measures sideways motion; its offset is longitudinal: front positive, rear negative.
     // 这些固定测量值用于旋转补偿，不是启动位置；清零时也不改变它们。
     // These fixed measurements compensate for rotation; they are not the starting pose and survive resets.
-    private static final double X_POD_OFFSET_MM = 101.6;   // 左侧 4 in / 4 in left of center
+    private static final double X_POD_OFFSET_MM = -101.6;  // 右侧 4 in / 4 in right of center
     private static final double Y_POD_OFFSET_MM = -146.05; // 后方 5.75 in / 5.75 in behind center
 
-    // 初始均为 FORWARD，实际方向需要手推测试：向前 X 增加，向左 Y 增加。
-    // Start with FORWARD for both; verify by pushing: forward increases X, left increases Y.
+    // 手推测试的正确方向：向前 X 增加，向左 Y 增加。
+    // Correct directions when pushed by hand: forward increases X, left increases Y.
+    // 实测 FORWARD 时向左推 Y 变小，所以 Y 改为 REVERSED；改完需用 Odometry Test 复测。
+    // With FORWARD, pushing left decreased Y, so Y is REVERSED; recheck with Odometry Test after changing.
     // 若某一路方向相反，只将对应常量改为 REVERSED，不要用 offset 的正负来修正。
     // If one pod counts backward, change its constant to REVERSED; do not change the offset sign.
     private static final GoBildaPinpointDriver.EncoderDirection X_ENCODER_DIRECTION =
             GoBildaPinpointDriver.EncoderDirection.FORWARD;
     private static final GoBildaPinpointDriver.EncoderDirection Y_ENCODER_DIRECTION =
-            GoBildaPinpointDriver.EncoderDirection.FORWARD;
+            GoBildaPinpointDriver.EncoderDirection.REVERSED;
 
     private final GoBildaPinpointDriver device;
 

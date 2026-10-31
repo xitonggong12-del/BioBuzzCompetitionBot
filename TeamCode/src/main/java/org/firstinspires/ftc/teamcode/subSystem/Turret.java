@@ -10,12 +10,14 @@ import com.qualcomm.robotcore.util.Range;
  * 管理 Shooter 的旋转舵机（goBILDA Dual Mode Servo，切换为 360° 连续旋转模式）。
  * Manages the shooter rotation servo (goBILDA Dual Mode Servo, set to 360° continuous rotation mode).
  *
- * 连续旋转模式下舵机没有位置反馈，所以用“动力 × 时间”粗略估算转台角度，并在 ±135° 处停住。
- * In continuous mode the servo has no position feedback, so the turret angle is roughly estimated
- * from power × time, and rotation stops at ±135°.
+ * 行程（从正上方看）：起点 0°，只能顺时针转到终点 270°，再逆时针转回起点；
+ * 起点和终点之间的 90° 不能经过，会扯到线。
+ * Travel (viewed from above): from the start at 0° it may only turn clockwise to the end at 270°,
+ * then counter-clockwise back; the 90° between end and start must never be crossed or it pulls the wires.
  *
- * 估算会随时间漂移：初始化前必须把转台摆到行程正中间（估算角度 0°）。
- * The estimate drifts over time: put the turret at the middle of its travel (estimated 0°) before init.
+ * 连续旋转模式下舵机没有位置反馈，所以用“动力 × 时间”估算角度；初始化前必须把转台摆到起点。
+ * In continuous mode the servo has no position feedback, so the angle is estimated from power × time;
+ * put the turret at the start before init.
  */
 public class Turret {
 
@@ -31,26 +33,27 @@ public class Turret {
     // Maximum rotation power; lower it if the shooter turns too fast to aim.
     private static final double MAX_POWER = 1.0;
 
-    // 齿轮比：转台齿圈 132 齿 / 舵机齿轮 51 齿，舵机转 2.59 圈转台转 1 圈。
-    // Gear ratio: 132-tooth turret ring / 51-tooth servo pinion; 2.59 servo turns per turret turn.
-    private static final double GEAR_RATIO = 132.0 / 51.0;
+    // 起点到终点的总行程，顺时针为正。 / Total travel from start to end, clockwise positive.
+    private static final double TRAVEL_DEG = 270.0;
 
-    // 舵机全速时的转速（RPM），暂定值，需实测：全速转 1 秒，量转台转了多少度，再反算。
-    // Servo speed at full power (RPM), a placeholder to measure: run full power for 1 second,
-    // measure how far the turret turned, and work back from that.
-    private static final double SERVO_MAX_RPM = 110.0;
+    // 全速从起点转到终点需要的秒数，必须实测：在 Turret Test 里按住 X 全速转一次，读屏幕上的 "Full-power sec"。
+    // 暂定值按 110 RPM 舵机、132:51 齿轮比估算。
+    // Seconds at full power from start to end; must be measured: in Turret Test hold X for one full-power run
+    // and read "Full-power sec". The placeholder assumes a 110 RPM servo through the 132:51 gearing.
+    private static final double FULL_POWER_TRAVEL_SECONDS = 1.06;
 
-    // 转台全速时每秒转过的角度。 / Turret degrees per second at full power.
-    private static final double TURRET_MAX_DEG_PER_SEC = SERVO_MAX_RPM * 360.0 / 60.0 / GEAR_RATIO;
-
-    // 总行程 270°，从中间开始两边各 135°；还不知道限位在哪边，所以先对称处理。
-    // 270° of total travel, 135° each way from center; the hard stops are not mapped yet, so treat it symmetrically.
-    private static final double ANGLE_LIMIT_DEG = 135.0;
+    // 离限位这么近时降速，减少惯性冲过限位。
+    // Slow down this close to a limit to reduce overshoot from momentum.
+    private static final double SLOW_ZONE_DEG = 30.0;
+    private static final double SLOW_ZONE_MAX_POWER = 0.3;
 
     private final CRServo servo;
     private final ElapsedTime loopTimer = new ElapsedTime();
 
-    private double estimatedAngleDeg = 0.0;
+    // 累计的“动力 × 秒”：全速转 1 秒加 1；除以 FULL_POWER_TRAVEL_SECONDS 就是行程比例。
+    // Accumulated power × seconds: one second at full power adds 1; divided by FULL_POWER_TRAVEL_SECONDS
+    // it is the fraction of travel.
+    private double powerSeconds = 0.0;
     private double commandedPower = 0.0;
 
     public Turret(HardwareMap hardwareMap) {
@@ -60,40 +63,66 @@ public class Turret {
     }
 
     /**
-     * 按比例旋转：正值顺时针，负值逆时针，范围 -1 到 1；到达估算限位后只允许往回转。
+     * 按比例旋转：正值顺时针，负值逆时针，范围 -1 到 1；在起点只能顺时针，在终点只能逆时针。
      * 每轮循环调用一次，角度估算依赖它。
      * Rotates proportionally: positive is clockwise, negative is counter-clockwise, range -1 to 1;
-     * at an estimated limit it only turns back. Call once per loop; the angle estimate depends on it.
+     * at the start it only turns clockwise and at the end only counter-clockwise.
+     * Call once per loop; the angle estimate depends on it.
      */
     public void rotate(double speed) {
-        updateEstimate();
+        updateEstimate(true);
         double power = Range.clip(speed, -1.0, 1.0) * MAX_POWER;
-        if ((power > 0.0 && estimatedAngleDeg >= ANGLE_LIMIT_DEG)
-                || (power < 0.0 && estimatedAngleDeg <= -ANGLE_LIMIT_DEG)) {
-            power = 0.0;
+        double angle = getEstimatedAngle();
+        if (power > 0.0) {
+            if (angle >= TRAVEL_DEG) {
+                power = 0.0;
+            } else if (angle >= TRAVEL_DEG - SLOW_ZONE_DEG) {
+                power = Math.min(power, SLOW_ZONE_MAX_POWER);
+            }
+        } else if (power < 0.0) {
+            if (angle <= 0.0) {
+                power = 0.0;
+            } else if (angle <= SLOW_ZONE_DEG) {
+                power = Math.max(power, -SLOW_ZONE_MAX_POWER);
+            }
         }
         setPower(power);
     }
 
+    /**
+     * 不受限位地旋转，只用于标定和把转台救回行程内；操作时必须盯着线。
+     * Rotates without limits, only for calibration and recovering the turret; watch the wires while using it.
+     */
+    public void rotateIgnoringLimits(double speed) {
+        updateEstimate(false);
+        setPower(Range.clip(speed, -1.0, 1.0) * MAX_POWER);
+    }
+
     /** 停止旋转。 / Stops rotating. */
     public void stop() {
-        updateEstimate();
+        updateEstimate(true);
         setPower(0.0);
     }
 
-    /** 把当前位置当作行程中间（0°）。 / Treats the current position as the middle of travel (0°). */
-    public void resetAngle() {
-        estimatedAngleDeg = 0.0;
+    /** 把当前位置当作起点（0°）。 / Treats the current position as the start (0°). */
+    public void resetToStart() {
+        powerSeconds = 0.0;
     }
 
-    /** 估算的转台角度，顺时针为正。 / Estimated turret angle, clockwise positive. */
+    /** 估算的转台角度，起点 0°，顺时针为正。 / Estimated turret angle: start is 0°, clockwise positive. */
     public double getEstimatedAngle() {
-        return estimatedAngleDeg;
+        return powerSeconds / FULL_POWER_TRAVEL_SECONDS * TRAVEL_DEG;
     }
 
-    /** 是否停在估算限位上。 / Whether the estimate is at a travel limit. */
+    /** 累计的全速秒数，标定 FULL_POWER_TRAVEL_SECONDS 用。 / Accumulated full-power seconds, for calibration. */
+    public double getFullPowerSeconds() {
+        return powerSeconds;
+    }
+
+    /** 是否停在起点或终点。 / Whether the estimate is at the start or the end. */
     public boolean isAtLimit() {
-        return Math.abs(estimatedAngleDeg) >= ANGLE_LIMIT_DEG;
+        double angle = getEstimatedAngle();
+        return angle <= 0.0 || angle >= TRAVEL_DEG;
     }
 
     /** 返回当前设定动力，供 Telemetry 显示。 / Returns commanded power for Telemetry. */
@@ -101,13 +130,15 @@ public class Turret {
         return commandedPower;
     }
 
-    private void updateEstimate() {
-        // 用上一轮的动力乘以经过的时间累加角度。
-        // Accumulate angle from the previous loop's power times the elapsed time.
+    private void updateEstimate(boolean clampToTravel) {
+        // 用上一轮的动力乘以经过的时间累加。
+        // Accumulate the previous loop's power times the elapsed time.
         double dt = loopTimer.seconds();
         loopTimer.reset();
-        estimatedAngleDeg += commandedPower * TURRET_MAX_DEG_PER_SEC * dt;
-        estimatedAngleDeg = Range.clip(estimatedAngleDeg, -ANGLE_LIMIT_DEG, ANGLE_LIMIT_DEG);
+        powerSeconds += commandedPower * dt;
+        if (clampToTravel) {
+            powerSeconds = Range.clip(powerSeconds, 0.0, FULL_POWER_TRAVEL_SECONDS);
+        }
     }
 
     private void setPower(double power) {

@@ -1,4 +1,4 @@
-package org.firstinspires.ftc.teamcode.aopModes;
+package org.firstinspires.ftc.teamcode.AopModes;
 
 import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
 import com.qualcomm.robotcore.eventloop.opmode.TeleOp;
@@ -12,9 +12,9 @@ import org.firstinspires.ftc.teamcode.subSystem.Turret;
  * 测试 Shooter：gamepad1 是 driver 只负责驾驶，gamepad2 负责发射、Intake 和 Shooter 旋转。
  * Tests the shooter: gamepad1 is the driver and only drives; gamepad2 runs shooting, intake, and shooter rotation.
  *
- * gamepad2：LB 发射 | RB Intake 向里 | LT 逆时针 | RT 顺时针 | A 飞轮 30% | B 飞轮反转 | BACK 转台角度归零
+ * gamepad2：LB 发射 | RB Intake 向里 | LT 逆时针 | RT 顺时针 | A 飞轮 30% | B 飞轮反转 | BACK 转台设为起点
  * gamepad2: LB shoot | RB intake in | LT counter-clockwise | RT clockwise | A flywheel 30% | B flywheel reverse
- * | BACK zero turret angle
+ * | BACK set turret start
  */
 @TeleOp(name = "Shooter Test", group = "test1")
 public class ShooterTest extends LinearOpMode {
@@ -39,10 +39,10 @@ public class ShooterTest extends LinearOpMode {
         Turret turret = new Turret(hardwareMap);
 
         telemetry.addLine("Shooter Test initialized");
-        telemetry.addLine("Center the turret before init!");
+        telemetry.addLine("Turn the turret to the START before init!");
         telemetry.addLine("GP1: drive");
         telemetry.addLine("GP2: LB shoot | RB intake | LT CCW | RT CW");
-        telemetry.addLine("GP2: A check 30% | B reverse | BACK zero turret");
+        telemetry.addLine("GP2: A check 30% | B reverse | BACK set turret start");
         telemetry.update();
 
         waitForStart();
@@ -89,10 +89,10 @@ public class ShooterTest extends LinearOpMode {
                 intake.stop();
             }
 
-            // 转台位置靠估算，漂了就手动摆回中间再按 BACK 归零。
-            // The turret position is estimated; if it drifts, move it back to center by hand and press BACK.
+            // 转台位置靠估算，漂了就转回起点再按 BACK。
+            // The turret position is estimated; if it drifts, turn it back to the start and press BACK.
             if (gamepad2.back) {
-                turret.resetAngle();
+                turret.resetToStart();
             }
 
             // RT 顺时针、LT 逆时针，按得越深转得越快；两个同时按会互相抵消。
